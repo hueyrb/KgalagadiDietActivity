@@ -1,7 +1,7 @@
-name: "KgalagadiDietActivity"
+name: KgalagadiDietActivity
 output_dir: ../docs
 navbar:
-  title: "KgalagadiDietActivity"
+  title: KgalagadiDietActivity
   left:
   - text: Home
     href: index.html
@@ -9,6 +9,10 @@ navbar:
     href: about.html
   - text: License
     href: license.html
+  right:
+  - icon: fa-github
+    text: Source code
+    href: https://github.com/hueyrb/KgalagadiDietActivity
 output:
   workflowr::wflow_html:
     toc: yes
