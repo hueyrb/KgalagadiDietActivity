@@ -1,0 +1,264 @@
+---
+title: "Te Leudril & hrs activity"
+author: "Ray Huey"
+date: "2020-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#  This script plots max and min Te for an inanimate lizard on ground at Leeudril. Then it also plots potential hours of activity over the year. Here's the code for downloading Te of inaninate and active lizard at Leeudril.
+```{r}
+# http://bioforecasts.science.unimelb.edu.au/ectotherm_ncep/
+#	2020-07-20 date of download
+
+# latitude -26.4049dfdsf
+# longitude 20.68589dfsdfsdf
+# state = inanimate mid
+# mass 6 (for lacertids)
+# height 1
+# shape lizard
+# stretch 3
+# did not check boxes for seek shade, burrow, etc., so liz is on the ground in open
+# absorptivity 85%
+# ran 1969, then 1970, then combined 
+
+# min forage 30
+# max forage 38
+# basking 25
+# leave retreat 24
+# ctmin 10
+# ctmax 45
+# preferred 35
+# jeat sogma; + 0.5
+```
+
+## libraries & theme_new_hgrid for plotting
+```{r}
+pacman::p_load(tidyverse, here, lubridate, cowplot, janitor,
+               patchwork)
+# this is for a plotting theme
+theme_new_hgrid <-
+  function (font_size = 14,
+            font_family = "",
+            line_size = 0.5,
+            rel_small = 12 / 14,
+            rel_tiny = 11 / 14,
+            rel_large = 16 / 14,
+            color = "grey85",
+            colour)
+  {
+    if (!missing(colour)) {
+      color <- colour
+    }
+    theme_minimal_grid(
+      font_size = font_size,
+      font_family = font_family,
+      line_size = line_size,
+      rel_small = rel_small,
+      rel_tiny = rel_tiny,
+      rel_large = rel_large,
+      color = color
+    ) %+replace% theme(
+      panel.grid.major.x = element_blank(),
+      axis.line.x = element_line(color = color, size = line_size),
+      complete = TRUE
+    ) %+replace%
+      theme(
+        panel.grid.major.y = element_blank(),
+        axis.line.y = element_line(color = color, size = line_size),
+        complete = TRUE
+      )
+  }
+```
+## plot daily max & min Te in open (non alive lizard)
+```{r}
+tmp <- read_csv(here::here("data", "LeeudrilTe2020-06-12.csv"))
+
+tmp <- tmp %>% mutate(datetime = mdy_hm(dates))
+tmp <- tmp %>% mutate(date = date(datetime))
+tmp <-
+  tmp %>% filter(date > "1969-10-31")   # thus 1969-11-01 to 1970-10-31
+tmp <- tmp %>% filter(date < "1970-11-01")
+```
+## determine daily max min and convert to long form
+```{r}
+maxmin <- tmp %>%
+  group_by(date) %>%
+  summarize(max = max(TC),
+            min = min(TC))
+maxmin <-
+  maxmin %>% pivot_longer(cols = c(max, min),
+                          names_to = "extreme",
+                          values_to = "Te")
+```
+## plots Te max min
+```{r}
+Leeudril_Te <- ggplot(maxmin, aes(date, Te, color = extreme)) +
+  geom_rect(
+    xmin = as.Date("1970-06-01"),
+    xmax = as.Date("1970-08-31"),
+    ymin = -20,
+    ymax = 91,
+    fill = "light gray",
+    alpha = 0.1,
+    color = NA
+  ) +
+  geom_point(size = 1) +
+  labs(title = "A) Maximum & minimum operative temperatures",
+       x = "",
+       y = "Temperature (°C)") +
+  theme_new_hgrid(14) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = c("red", "blue")) +
+  geom_hline(yintercept = 30,
+             color = "blue",
+             linetype = 2) +
+  geom_hline(yintercept = 37,
+             color = "red",
+             linetype = 2)  +
+  theme(
+    plot.title = element_text(hjust = 0, face = "italic", size = 14),
+    plot.title.position = "plot"
+  ) +
+  annotate(
+    "text",
+    x = as.Date("1970-07-15"),
+    80,
+    label = "winter",
+    size = 4
+  )
+
+Leeudril_Te
+```
+## Compute median max & min Te on ground at Leudril in winter months 1970
+```{r}
+maxmin$month <- month(maxmin$date)
+winter<- maxmin %>% filter(month %in% c(6:8))
+
+outwinter <- winter %>% group_by(extreme) %>% 
+	summarize(medianTe = median(Te))
+outwinter
+
+summer<- maxmin %>% filter(month %in% c(12, 1, 2))
+
+outsummer<- summer %>% group_by(extreme) %>% 
+	summarize(medianTe = median(Te))
+outsummer
+
+```
+## Compute potential hours of activity for a thermoregulating lizard
+```{r}
+#  input values for the shiny app.
+# seek shade, burrow, burrow shade all checked
+# min forage 32
+# max forage 38
+# basking 30
+# leave retreat 25
+# CTmin  13.5
+# CTmax 44.15
+# preferred 36   # values bases on MEROLES
+
+tmp <- read_csv(here::here("data", "LeeudrilTeLizard69-70.csv"))
+# fix dates
+tmp <- tmp %>% mutate(datetime = mdy_hm(dates))
+tmp <- tmp %>% mutate(date = date(datetime))
+tmp <- tmp %>% filter(date > "1969-10-31")
+tmp$month <- month(tmp$date)
+tmp$year <- year(tmp$date)
+```
+## plot showing daily variation in hoa
+```{r}
+tmp <- tmp %>% mutate(datetime = mdy_hm(dates))
+tmp <- tmp %>% mutate(date = date(datetime))
+tmp <- tmp %>% filter(date > "1969-10-31") 
+hrs <- tmp %>% 
+	group_by(date) %>% 
+	summarize(acttime = sum(ACT > 1), .groups = 'drop')
+```
+## plot hours of activity over year
+```{r}
+dayhrs <- ggplot(hrs, aes(date, acttime)) +
+  # 	geom_point() +
+  scale_y_continuous(expand = c(0, 0), limits = c(-0.15, 14)) +
+  geom_rect(
+    xmin = as.Date("1970-06-01"),
+    xmax = as.Date("1970-08-31"),
+    ymin = -.15,
+    ymax = 13.35,
+    fill = "light gray",
+    alpha = 0.1,
+    color = NA
+  ) +
+  geom_point(size = 1) +
+  labs(title = "B)  Potential hours of activity",
+       x = "",
+       y = "Hours (integer)")  +
+  theme_new_hgrid(14) 	+
+  theme(
+    plot.title = element_text(hjust = 0, face = "italic", size = 14),
+    plot.title.position = "plot"
+  ) +
+  stat_smooth(span = .3)
+```
+## group the plots
+```{r}
+x <- Leeudril_Te + dayhrs
+x
+ggsave(
+  here::here("output", "LeeudrilTeHrsAct.pdf"),
+  plot = last_plot(),
+  device = NULL,
+  scale = 1,
+  width = 10,
+  height = 4,
+  units = "in",
+  dpi = 300,
+  limitsize = TRUE
+)
+```
+## plot of hours of activity by MONTH. Save but don't use.
+ ```{r}
+ hrs <- tmp %>%
+ 	group_by(year, month) %>%
+ 	summarise(hoa = length(ACT[ACT == 2]))
+
+ # add date vector, with dates for trip
+ hrs$date <- date(c("1969-11-15", "1969-12-15", "1970-01-15", "1970-02-14", "1970-03-15", "1970-04-15", "1970-05-15", "1970-06-15", 	"1970-07-15", "1970-08-15", "1970-09-15", "1970-10-15"))
+ hrs$days <- c(30, 31, 31, 28, 31, 30, 31, 30,31, 31,31, 31)
+ hrs$hoa_day <- hrs$hoa/hrs$days
+
+ maxhoa <- max(hrs$hoa)
+ maxhoa
+ ```
+## plot hrs of activity by month   different x axes
+```{r}
+hoa_by_month <- ggplot(hrs, aes(date, hoa_day)) + geom_point() +
+  theme_new_hgrid(14) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 12)) +
+  xlim(as.Date("1969-11-01"), as.Date("1970-10-31")) +
+  geom_rect(
+    xmin = as.Date("1970-06-01"),
+    xmax = as.Date("1970-08-31"),
+    ymin = 0,
+    ymax = 13,
+    fill = "light gray",
+    alpha = 0.1,
+    color = NA
+  ) +
+  geom_point(size = 1) +
+  labs(x = "",
+       y = "Hours per day",
+       title = "B)  Potential hours of activity") +
+  theme(
+    plot.title = element_text(hjust = 0, face = "italic", size = 14),
+    plot.title.position = "plot"
+  )
+hoa_by_month
+```
+## group the plots -- saved but not used
+```{r}
+# x <- Leeudril_Te + hoa_by_month
+# ggsave(here::here("images", "LeudrilTeAct.pdf"), plot = last_plot(), device = NULL,  scale = 1, width = 10, height = 4, units = "in",  dpi = 300, limitsize = TRUE)
+```
