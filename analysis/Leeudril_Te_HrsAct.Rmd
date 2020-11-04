@@ -201,9 +201,10 @@ dayhrs <- ggplot(hrs, aes(date, acttime)) +
     plot.title.position = "plot"
   ) +
   stat_smooth(span = .3)
+dayhrs 
 ```
 ## group the plots
-```{r}
+```{r,ffig.width = 8, fig.height = 5}
 x <- Leeudril_Te + dayhrs
 x
 ggsave(
